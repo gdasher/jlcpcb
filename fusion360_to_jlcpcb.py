@@ -4,12 +4,12 @@ Transform Autodesk Fusion 360 PCB assembly exports (BOM + CPL CSVs)
 to the format required by JLCPCB (BOM + CPL xlsx).
 
 Usage:
-    python3 fusion360_to_jlcpcb.py BOM.csv FRONT_CPL.csv BACK_CPL.csv [options]
+    python3 fusion360_to_jlcpcb.py BOM.csv FRONT_CPL.csv [BACK_CPL.csv] [options]
 
 Arguments:
     BOM.csv         Fusion 360 BOM export (CSV)
     FRONT_CPL.csv   Fusion 360 Pick-and-Place front-side CSV
-    BACK_CPL.csv    Fusion 360 Pick-and-Place back-side CSV
+    BACK_CPL.csv    Fusion 360 Pick-and-Place back-side CSV (omit for single-sided boards)
 
 Options:
     --bom-out PATH  Output path for BOM xlsx (default: ./bom.xlsx)
@@ -204,7 +204,8 @@ def ParseArgs() -> argparse.Namespace:
   )
   parser.add_argument("bomCsv", metavar="BOM.csv", help="Fusion 360 BOM CSV")
   parser.add_argument("frontCplCsv", metavar="FRONT_CPL.csv", help="Fusion 360 front-side CPL CSV")
-  parser.add_argument("backCplCsv", metavar="BACK_CPL.csv", help="Fusion 360 back-side CPL CSV")
+  parser.add_argument("backCplCsv", metavar="BACK_CPL.csv", nargs="?", default=None,
+                      help="Fusion 360 back-side CPL CSV (omit for single-sided boards)")
   parser.add_argument("--bom-out", metavar="PATH", default="bom.xlsx",
                       help="Output path for BOM xlsx (default: ./bom.xlsx)")
   parser.add_argument("--cpl-out", metavar="PATH", default="cpl.xlsx",
@@ -217,11 +218,11 @@ def Main() -> None:
 
   bomPath = Path(args.bomCsv)
   frontPath = Path(args.frontCplCsv)
-  backPath = Path(args.backCplCsv)
+  backPath = Path(args.backCplCsv) if args.backCplCsv else None
   bomOut = Path(args.bom_out)
   cplOut = Path(args.cpl_out)
 
-  for p in (bomPath, frontPath, backPath):
+  for p in filter(None, (bomPath, frontPath, backPath)):
     if not p.exists():
       print(f"Error: file not found: {p}", file=sys.stderr)
       sys.exit(1)
@@ -229,11 +230,14 @@ def Main() -> None:
   print("Reading Fusion 360 exports...")
   bomData = ReadFusionBom(bomPath)
   frontCpl = ReadFusionCpl(frontPath, layer="Top")
-  backCpl = ReadFusionCpl(backPath, layer="Bottom")
+  backCpl = ReadFusionCpl(backPath, layer="Bottom") if backPath else []
 
   print(f"  BOM: {len(bomData)} line items")
   print(f"  Front CPL: {len(frontCpl)} placements")
-  print(f"  Back CPL:  {len(backCpl)} placements")
+  if backPath:
+    print(f"  Back CPL:  {len(backCpl)} placements")
+  else:
+    print("  Back CPL:  (omitted — single-sided board)")
 
   bomRows = BuildJlcpcbBomRows(bomData)
   cplRows = frontCpl + backCpl
