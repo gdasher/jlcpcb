@@ -11,6 +11,11 @@ Arguments:
     FRONT_CPL.csv   Fusion 360 Pick-and-Place front-side CSV
     BACK_CPL.csv    Fusion 360 Pick-and-Place back-side CSV (omit for single-sided boards)
 
+The JLCPCB part number (LCSC code, e.g. C1525) is taken from the JLC_PART
+attribute on each part (LCSC, LCSC_PART and JLCPCB_PART are accepted too).
+Fusion's BOM groups parts by value, device, package and attributes, so every
+designator on a row shares the same code.
+
 Options:
     --bom-out PATH  Output path for BOM xlsx (default: ./bom.xlsx)
     --cpl-out PATH  Output path for CPL xlsx (default: ./cpl.xlsx)
@@ -60,6 +65,19 @@ def _ChooseComment(value: str, device: str, description: str) -> str:
   return device
 
 
+# Attribute columns that may hold the JLCPCB/LCSC part number, in priority order.
+_jlcPartColumns = ("JLC_PART", "LCSC", "LCSC_PART", "JLCPCB_PART")
+
+
+def _JlcPart(row: dict) -> str:
+  """Return the JLCPCB/LCSC part number from a Fusion BOM row, or ''."""
+  byName = {(k or "").strip().upper(): (v or "").strip() for k, v in row.items()}
+  for column in _jlcPartColumns:
+    if byName.get(column):
+      return byName[column]
+  return ""
+
+
 def _FormatDesignators(parts: str) -> str:
   """Normalise designator list: strip whitespace around commas."""
   return ", ".join(d.strip() for d in parts.split(","))
@@ -92,7 +110,7 @@ def BuildJlcpcbBomRows(bomRows: list[dict]) -> list[tuple]:
 
     comment = _ChooseComment(value, device, description)
     designator = _FormatDesignators(parts)
-    result.append((comment, designator, package, ""))
+    result.append((comment, designator, package, _JlcPart(row)))
   return result
 
 
