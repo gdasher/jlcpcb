@@ -51,6 +51,13 @@ def _Mm(value: float) -> str:
   return str(Decimal(round(value * 320000) * 3.125e-6).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
+def _BomAttributes(element: dict) -> dict:
+  """Attributes as Fusion's BOM groups and prints them: no NAME, no empties, and VALUE
+  only when it differs from the part value."""
+  return {k: v for k, v in element["attrs"].items()
+          if k != "NAME" and v and not (k == "VALUE" and v == element["value"])}
+
+
 def WriteBom(parts: dict, elements: dict, path: Path) -> int:
   attrNames = sorted({k for e in elements.values() for k in e["attrs"] if k != "NAME"})
   groups = {}
@@ -58,7 +65,7 @@ def WriteBom(parts: dict, elements: dict, path: Path) -> int:
     if not element.get("populate", True):
       continue
     part = parts.get(ref, {})
-    attrs = tuple(sorted((k, v) for k, v in element["attrs"].items() if k != "NAME"))
+    attrs = tuple(sorted(_BomAttributes(element).items()))
     key = (element["value"], _Device(part), element["pkg"], _Description(part), attrs)
     groups.setdefault(key, []).append(ref)
 
